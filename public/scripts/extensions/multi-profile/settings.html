@@ -1,26 +1,28 @@
-<div id="multi_profile_container" class="multi-profile-container">
+<div id="multi_profile_container" class="wide100p">
     <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
             <b>Multi-Profile Overrides</b>
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
         <div class="inline-drawer-content">
-            <small>Assign a connection profile to a feature so it does not use the globally selected one. Profiles are managed under <em>Connection Profiles</em>. Leave a feature unassigned to use the active global profile.</small>
+            <div class="marginBot10">
+                <small>Assign a connection profile to a feature so it does not use the globally selected one. Profiles are managed under <em>Connection Profiles</em>. Leave a feature unassigned to use the active global profile.</small>
+            </div>
 
-            <label for="multi_profile_memory" class="multi-profile-row">
-                <span>Story summary</span>
-                <select id="multi_profile_memory" class="multi-profile-select"></select>
-            </label>
+            <div class="flex-container marginBot5">
+                <label for="multi_profile_memory" class="flex1">Story summary</label>
+                <select id="multi_profile_memory" class="text_pole flex2"></select>
+            </div>
 
-            <label for="multi_profile_expressions" class="multi-profile-row">
-                <span>Character expressions</span>
-                <select id="multi_profile_expressions" class="multi-profile-select"></select>
-            </label>
+            <div class="flex-container marginBot5">
+                <label for="multi_profile_expressions" class="flex1">Character expressions</label>
+                <select id="multi_profile_expressions" class="text_pole flex2"></select>
+            </div>
 
-            <label for="multi_profile_sd" class="multi-profile-row">
-                <span>Image generation</span>
-                <select id="multi_profile_sd" class="multi-profile-select"></select>
-            </label>
+            <div class="flex-container marginBot5">
+                <label for="multi_profile_sd" class="flex1">Image generation</label>
+                <select id="multi_profile_sd" class="text_pole flex2"></select>
+            </div>
         </div>
     </div>
 </div>
