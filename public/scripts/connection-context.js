@@ -96,23 +96,30 @@ const generationMutex = (() => {
  * Run `fn` with the given connection profile temporarily applied. The previous state is captured
  * before the swap and restored after, regardless of whether `fn` resolves or rejects.
  *
+ * Fast path: if `profileId` is null/empty/unknown, no override is requested and `fn` runs directly
+ * without acquiring the mutex. This avoids deadlocks if `fn` itself triggers re-entrant generation
+ * (e.g., extension event handlers that call generateRaw inside a Generate flow), and removes the
+ * serialisation overhead from the common no-override case. The race-protection guarantee is then
+ * weaker — concurrent override + non-override calls can briefly observe swapped globals — but
+ * deadlock-freeness wins.
+ *
  * @template T
  * @param {string|null|undefined} profileId  Profile id to apply, or null/empty for pass-through.
  * @param {() => Promise<T>} fn
  * @returns {Promise<T>}
  */
 export async function withConnectionProfile(profileId, fn) {
+    if (!profileId || !provider) {
+        return await fn();
+    }
+
+    const target = provider.getProfileById(profileId);
+    if (!target) {
+        console.warn(`[connection-context] profile ${profileId} not found; running with current profile`);
+        return await fn();
+    }
+
     return generationMutex.run(async () => {
-        if (!profileId || !provider) {
-            return await fn();
-        }
-
-        const target = provider.getProfileById(profileId);
-        if (!target) {
-            console.warn(`[connection-context] profile ${profileId} not found; running with current profile`);
-            return await fn();
-        }
-
         const snapshot = await provider.snapshotCurrent();
         try {
             await provider.applyProfile(target);
