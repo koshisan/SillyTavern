@@ -1,0 +1,10 @@
+{
+    "display_name": "Multi-Profile",
+    "loading_order": 2,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "author": "koshisan",
+    "version": "0.1.0",
+    "homePage": "https://github.com/koshisan/SillyTavern"
+}

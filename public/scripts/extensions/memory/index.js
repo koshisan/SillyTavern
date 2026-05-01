@@ -20,6 +20,7 @@ import {
 } from '../../../script.js';
 import { is_group_generating, selected_group } from '../../group-chats.js';
 import { loadMovingUIState, power_user } from '../../power-user.js';
+import { getFeatureProfile } from '../../connection-context.js';
 import { dragElement } from '../../RossAscends-mods.js';
 import { getTextTokens, getTokenCountAsync, tokenizers } from '../../tokenizers.js';
 import { debounce_timeout } from '../../constants.js';
@@ -521,7 +522,7 @@ async function summarizeCallback(args, text) {
             case summary_sources.extras:
                 return await callExtrasSummarizeAPI(text);
             case summary_sources.main:
-                return removeReasoningFromString(await generateRaw({ prompt: text, systemPrompt: prompt, responseLength: extension_settings.memory.overrideResponseLength }));
+                return removeReasoningFromString(await generateRaw({ prompt: text, systemPrompt: prompt, responseLength: extension_settings.memory.overrideResponseLength, connectionProfile: getFeatureProfile('memory') }));
             case summary_sources.webllm: {
                 const messages = [{ role: 'system', content: prompt }, { role: 'user', content: text }].filter(m => m.content);
                 const params = extension_settings.memory.overrideResponseLength > 0 ? { max_tokens: extension_settings.memory.overrideResponseLength } : {};
@@ -697,6 +698,7 @@ async function summarizeChatMain(context, force, skipWIAN) {
                 quietPrompt: prompt,
                 skipWIAN: skipWIAN,
                 responseLength: extension_settings.memory.overrideResponseLength,
+                connectionProfile: getFeatureProfile('memory'),
             };
             summary = await generateQuietPrompt(params);
         } finally {
@@ -727,6 +729,7 @@ async function summarizeChatMain(context, force, skipWIAN) {
                 prompt: rawPrompt,
                 systemPrompt: prompt,
                 responseLength: extension_settings.memory.overrideResponseLength,
+                connectionProfile: getFeatureProfile('memory'),
             };
             const rawSummary = await generateRaw(params);
             summary = removeReasoningFromString(rawSummary);

@@ -19,6 +19,7 @@ import { performFuzzySearch } from '/scripts/power-user.js';
 import { StreamingDisplay } from '/scripts/streaming-display.js';
 import { ConnectionManagerRequestService } from '../shared.js';
 import { formatReasoning } from '/scripts/reasoning.js';
+import { registerConnectionProfileProvider } from '../../connection-context.js';
 
 const MODULE_NAME = 'connection-manager';
 const NONE = '<None>';
@@ -480,6 +481,29 @@ async function renderDetailsContent(detailsContent) {
 }
 
 /**
+ * Take a fresh snapshot of the current connection state. The snapshot is an opaque
+ * profile-shaped object usable as the argument to applyConnectionProfile() to restore.
+ * @returns {Promise<ConnectionProfile>}
+ */
+async function snapshotCurrentProfile() {
+    const mode = main_api === 'openai' ? 'cc' : 'tc';
+    /** @type {ConnectionProfile} */
+    const snapshot = { id: '__snapshot__', name: '__snapshot__', mode, exclude: [] };
+    await readProfileFromCommands(mode, snapshot, true);
+    return snapshot;
+}
+
+/**
+ * Look up a profile by id from the saved profile list.
+ * @param {string} id
+ * @returns {ConnectionProfile|null}
+ */
+function getProfileById(id) {
+    if (!id) return null;
+    return extension_settings.connectionManager?.profiles?.find(p => p.id === id) ?? null;
+}
+
+/**
  * Callback for the /profile-genstream command
  * Generates text using Connection Manager with streaming display support.
  * @param {object} args Named arguments
@@ -703,6 +727,12 @@ export async function init() {
             extension_settings.connectionManager[key] = DEFAULT_SETTINGS[key];
         }
     }
+
+    registerConnectionProfileProvider({
+        getProfileById,
+        snapshotCurrent: snapshotCurrentProfile,
+        applyProfile: applyConnectionProfile,
+    });
 
     const container = document.getElementById('rm_api_block');
     const settings = await renderExtensionTemplateAsync(MODULE_NAME, 'settings');

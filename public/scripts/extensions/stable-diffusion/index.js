@@ -46,6 +46,7 @@ import { SECRET_KEYS, secret_state } from '../../secrets.js';
 import { getNovelAnlas, getNovelUnlimitedImageGeneration, loadNovelSubscriptionData } from '../../nai-settings.js';
 import { getMultimodalCaption } from '../shared.js';
 import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
+import { getFeatureProfile } from '../../connection-context.js';
 import { SlashCommand } from '../../slash-commands/SlashCommand.js';
 import {
     ARGUMENT_TYPE,
@@ -3291,7 +3292,7 @@ function getUserAvatarUrl() {
  */
 async function generatePrompt(quietPrompt) {
     const toast = toastr.info('Generating image prompt with an LLM...', 'Image Generation');
-    const reply = await generateQuietPrompt({ quietPrompt });
+    const reply = await generateQuietPrompt({ quietPrompt, connectionProfile: getFeatureProfile('sd') });
     const processedReply = processReply(reply);
     toastr.clear(toast);
 

@@ -13,6 +13,7 @@ import {
 
 import { humanizedDateTime, favsToHotswap, getMessageTimeStamp, dragElement, isMobile, initRossMods } from './scripts/RossAscends-mods.js';
 import { userStatsHandler, statMesProcess, initStats } from './scripts/stats.js';
+import { withConnectionProfile } from './scripts/connection-context.js';
 import {
     generateKoboldWithStreaming,
     kai_settings,
@@ -3022,40 +3023,42 @@ export function getStoppingStrings(isImpersonate, isContinue, api = main_api) {
  * @param {GenerateQuietPromptParams} params Parameters for the quiet prompt generation
  * @returns {Promise<string>} Generated text. If using structured output, will contain a serialized JSON object.
  */
-export async function generateQuietPrompt({ quietPrompt = '', quietToLoud = false, skipWIAN = false, quietImage = null, quietName = null, responseLength = null, forceChId = null, jsonSchema = null, removeReasoning = true, trimToSentence = false } = {}) {
+export async function generateQuietPrompt({ quietPrompt = '', quietToLoud = false, skipWIAN = false, quietImage = null, quietName = null, responseLength = null, forceChId = null, jsonSchema = null, removeReasoning = true, trimToSentence = false, connectionProfile = null } = {}) {
     if (arguments.length > 0 && typeof arguments[0] !== 'object') {
         console.trace('generateQuietPrompt called with positional arguments. Please use an object instead.');
         [quietPrompt, quietToLoud, skipWIAN, quietImage, quietName, responseLength, forceChId, jsonSchema] = arguments;
     }
 
-    const responseLengthCustomized = typeof responseLength === 'number' && responseLength > 0;
-    let eventHook = () => { };
-    try {
-        /** @type {GenerateOptions} */
-        const generateOptions = {
-            quiet_prompt: quietPrompt ?? '',
-            quietToLoud: quietToLoud ?? false,
-            skipWIAN: skipWIAN ?? false,
-            force_name2: true,
-            quietImage: quietImage ?? null,
-            quietName: quietName ?? null,
-            force_chid: forceChId ?? null,
-            jsonSchema: jsonSchema ?? null,
-        };
-        if (responseLengthCustomized) {
-            TempResponseLength.save(main_api, responseLength);
-            eventHook = TempResponseLength.setupEventHook(main_api);
+    return await withConnectionProfile(connectionProfile, async () => {
+        const responseLengthCustomized = typeof responseLength === 'number' && responseLength > 0;
+        let eventHook = () => { };
+        try {
+            /** @type {GenerateOptions} */
+            const generateOptions = {
+                quiet_prompt: quietPrompt ?? '',
+                quietToLoud: quietToLoud ?? false,
+                skipWIAN: skipWIAN ?? false,
+                force_name2: true,
+                quietImage: quietImage ?? null,
+                quietName: quietName ?? null,
+                force_chid: forceChId ?? null,
+                jsonSchema: jsonSchema ?? null,
+            };
+            if (responseLengthCustomized) {
+                TempResponseLength.save(main_api, responseLength);
+                eventHook = TempResponseLength.setupEventHook(main_api);
+            }
+            let result = await Generate('quiet', generateOptions);
+            result = trimToSentence ? trimToEndSentence(result) : result;
+            result = removeReasoning ? removeReasoningFromString(result) : result;
+            return result;
+        } finally {
+            if (responseLengthCustomized && TempResponseLength.isCustomized()) {
+                TempResponseLength.restore(main_api);
+                TempResponseLength.removeEventHook(main_api, eventHook);
+            }
         }
-        let result = await Generate('quiet', generateOptions);
-        result = trimToSentence ? trimToEndSentence(result) : result;
-        result = removeReasoning ? removeReasoningFromString(result) : result;
-        return result;
-    } finally {
-        if (responseLengthCustomized && TempResponseLength.isCustomized()) {
-            TempResponseLength.restore(main_api);
-            TempResponseLength.removeEventHook(main_api, eventHook);
-        }
-    }
+    });
 }
 
 /**
@@ -3938,7 +3941,11 @@ export function createRawPrompt(prompt, api, instructOverride, quietToLoud, syst
  * @param {GenerateRawParams} params Parameters for generating a message
  * @returns {Promise<object | string>} Raw API response data, or a JSON string extracted from the response when `jsonSchema` is provided.
  */
-export async function generateRawData({ prompt = '', api = null, instructOverride = false, quietToLoud = false, systemPrompt = '', responseLength = null, prefill = '', jsonSchema = null } = {}) {
+export async function generateRawData({ prompt = '', api = null, instructOverride = false, quietToLoud = false, systemPrompt = '', responseLength = null, prefill = '', jsonSchema = null, connectionProfile = null } = {}) {
+    if (connectionProfile) {
+        return await withConnectionProfile(connectionProfile, () =>
+            generateRawData({ prompt, api, instructOverride, quietToLoud, systemPrompt, responseLength, prefill, jsonSchema }));
+    }
     if (!api) {
         api = main_api;
     }
@@ -4060,13 +4067,13 @@ export async function generateRawData({ prompt = '', api = null, instructOverrid
  * @param {GenerateRawParams} params Parameters for generating a message
  * @returns {Promise<string>} Generated output: a cleaned-up message string when `jsonSchema` is not provided, or an extracted JSON string conforming to `jsonSchema` when it is.
  */
-export async function generateRaw({ prompt = '', api = null, instructOverride = false, quietToLoud = false, systemPrompt = '', responseLength = null, trimNames = true, prefill = '', jsonSchema = null } = {}) {
+export async function generateRaw({ prompt = '', api = null, instructOverride = false, quietToLoud = false, systemPrompt = '', responseLength = null, trimNames = true, prefill = '', jsonSchema = null, connectionProfile = null } = {}) {
     if (arguments.length > 0 && typeof arguments[0] !== 'object') {
         console.trace('generateRaw called with positional arguments. Please use an object instead.');
         [prompt, api, instructOverride, quietToLoud, systemPrompt, responseLength, trimNames, prefill, jsonSchema] = arguments;
     }
 
-    const data = await generateRawData({ prompt, api, instructOverride, quietToLoud, systemPrompt, responseLength, prefill, jsonSchema });
+    const data = await generateRawData({ prompt, api, instructOverride, quietToLoud, systemPrompt, responseLength, prefill, jsonSchema, connectionProfile });
 
     // JSON string (matching the provided schema) will already be extracted.
     if (jsonSchema) {
