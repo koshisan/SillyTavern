@@ -120,16 +120,56 @@ export async function withConnectionProfile(profileId, fn) {
     }
 
     return generationMutex.run(async () => {
+        console.log('[connection-context] swap → snapshotting current state');
         const snapshot = await provider.snapshotCurrent();
+        console.log('[connection-context] snapshot:', JSON.parse(JSON.stringify(snapshot)));
+        console.log('[connection-context] applying override profile:', target.name, JSON.parse(JSON.stringify(target)));
         try {
             await provider.applyProfile(target);
-            return await fn();
+            await waitForConnection('after override apply');
+            console.log('[connection-context] override applied; running fn');
+            const result = await fn();
+            console.log('[connection-context] fn returned:', typeof result, result === undefined ? '(undefined)' : result === null ? '(null)' : (typeof result === 'string' ? `"${result.slice(0, 80)}"` : '...'));
+            return result;
         } finally {
+            console.log('[connection-context] restoring snapshot');
             try {
                 await provider.applyProfile(snapshot);
+                await waitForConnection('after snapshot restore');
+                console.log('[connection-context] snapshot restored');
             } catch (e) {
                 console.error('[connection-context] failed to restore previous connection profile', e);
             }
         }
     });
+}
+
+/**
+ * After a profile apply, the new connection may still be in flight (the /api-url slash command
+ * triggers the connect button asynchronously and returns immediately). If we proceed to Generate()
+ * before the connection comes online, Generate sees online_status==='no_connection' and bails
+ * out returning undefined. Wait briefly for the connection to settle.
+ */
+async function waitForConnection(label) {
+    const onlineStatus = globalThis.online_status ?? (await import('../script.js')).online_status;
+    const deadline = Date.now() + 5000;
+    let current = onlineStatus;
+    let lastSeen = current;
+    while (Date.now() < deadline) {
+        // Re-read by re-importing the live binding each tick. This module-eval cost is amortised
+        // because the import is cached after the first call.
+        // eslint-disable-next-line no-await-in-loop
+        const mod = await import('../script.js');
+        current = mod.online_status;
+        if (current && current !== 'no_connection') {
+            if (lastSeen !== current) {
+                console.log(`[connection-context] online_status=${current} (${label})`);
+            }
+            return;
+        }
+        lastSeen = current;
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(r => setTimeout(r, 100));
+    }
+    console.warn(`[connection-context] connection did not come online within 5s (${label}), online_status=${current}`);
 }

@@ -10,7 +10,6 @@ const NONE = '';
  * Keep in sync with the keys passed to `getFeatureProfile()` in core / extensions.
  */
 const FEATURES = [
-    { id: 'chat',        elementId: 'multi_profile_chat' },
     { id: 'memory',      elementId: 'multi_profile_memory' },
     { id: 'expressions', elementId: 'multi_profile_expressions' },
     { id: 'sd',          elementId: 'multi_profile_sd' },
