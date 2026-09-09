@@ -245,12 +245,6 @@ export const reasoning_effort_types = {
     max: 'max',
 };
 
-export const lmstudio_thinking_states = {
-    auto: 'auto',
-    on: 'on',
-    off: 'off',
-};
-
 export const verbosity_levels = {
     auto: 'auto',
     low: 'low',
@@ -521,7 +515,7 @@ const default_settings = {
     seed: -1,
     n: 1,
     bind_preset_to_connection: true,
-    lmstudio_enable_thinking: 'auto',
+    lmstudio_enable_thinking: false,
     extensions: {},
 };
 
@@ -2929,11 +2923,10 @@ export async function createGenerationParameters(settings, model, type, messages
         generate_data.custom_exclude_body = substituteParams(settings.custom_exclude_body);
         generate_data.custom_include_headers = substituteParams(settings.custom_include_headers);
 
-        if (settings.lmstudio_enable_thinking === lmstudio_thinking_states.on) {
-            generate_data.chat_template_kwargs = { ...(generate_data.chat_template_kwargs || {}), enable_thinking: true };
-        } else if (settings.lmstudio_enable_thinking === lmstudio_thinking_states.off) {
-            generate_data.chat_template_kwargs = { ...(generate_data.chat_template_kwargs || {}), enable_thinking: false };
-        }
+        generate_data.chat_template_kwargs = {
+            ...(generate_data.chat_template_kwargs || {}),
+            enable_thinking: Boolean(settings.lmstudio_enable_thinking),
+        };
     }
 
     if (settings.chat_completion_source === chat_completion_sources.COHERE) {
@@ -7393,45 +7386,41 @@ export function initOpenAI() {
     $('#customize_additional_parameters').on('click', onCustomizeParametersClick);
     $('#openai_proxy_preset').on('change', onProxyPresetChange);
 
-    initLmstudioThinkingWand();
+    eventSource.once(event_types.APP_READY, initLmstudioThinkingWand);
 }
 
 function initLmstudioThinkingWand() {
+    if (typeof oai_settings.lmstudio_enable_thinking !== 'boolean') {
+        oai_settings.lmstudio_enable_thinking = false;
+    }
+
+    const $container = $('#lmstudio_thinking_wand_container');
+    if (!$container.length || $container.children('#lmstudio_thinking_toggle').length) {
+        return;
+    }
+
     const buttonHtml = `
-        <div id="lmstudio_thinking_toggle" class="list-group-item flex-container flexGap5" title="${t`Toggle enable_thinking chat_template_kwargs for OpenAI-compatible (Custom) sources such as LM Studio.`}">
+        <div id="lmstudio_thinking_toggle" class="list-group-item flex-container flexGap5" title="${t`Send chat_template_kwargs.enable_thinking on Custom (OpenAI-compatible) sources such as LM Studio.`}">
             <div class="fa-solid fa-brain extensionsMenuExtensionButton"></div>
             <span class="lmstudio_thinking_label"></span>
         </div>`;
-    $('#lmstudio_thinking_wand_container').append(buttonHtml);
+    $container.append(buttonHtml);
 
     const $button = $('#lmstudio_thinking_toggle');
     const $label = $button.find('.lmstudio_thinking_label');
 
-    const stateLabel = () => {
-        switch (oai_settings.lmstudio_enable_thinking) {
-            case lmstudio_thinking_states.on: return t`Thinking: On`;
-            case lmstudio_thinking_states.off: return t`Thinking: Off`;
-            default: return t`Thinking: Auto`;
-        }
-    };
-
     const refreshVisual = () => {
-        $label.text(stateLabel());
-        $button
-            .toggleClass('lmstudio_thinking_on', oai_settings.lmstudio_enable_thinking === lmstudio_thinking_states.on)
-            .toggleClass('lmstudio_thinking_off', oai_settings.lmstudio_enable_thinking === lmstudio_thinking_states.off);
+        const on = Boolean(oai_settings.lmstudio_enable_thinking);
+        $label.text(on ? t`Thinking: On` : t`Thinking: Off`);
+        $button.toggleClass('lmstudio_thinking_on', on);
     };
 
     const refreshVisibility = () => {
-        const visible = oai_settings.chat_completion_source === chat_completion_sources.CUSTOM;
-        $button.toggle(visible);
+        $button.toggle(oai_settings.chat_completion_source === chat_completion_sources.CUSTOM);
     };
 
     $button.on('click', function () {
-        const cycle = [lmstudio_thinking_states.auto, lmstudio_thinking_states.on, lmstudio_thinking_states.off];
-        const cur = oai_settings.lmstudio_enable_thinking;
-        const idx = cycle.indexOf(cur);
-        oai_settings.lmstudio_enable_thinking = cycle[(idx + 1) % cycle.length] ?? lmstudio_thinking_states.auto;
+        oai_settings.lmstudio_enable_thinking = !oai_settings.lmstudio_enable_thinking;
         refreshVisual();
         saveSettingsDebounced();
     });
