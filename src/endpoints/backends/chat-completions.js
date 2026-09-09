@@ -2404,6 +2404,42 @@ router.post('/generate', async function (request, response) {
                     ...(bodyParams.chat_template_kwargs || {}),
                     ...request.body.chat_template_kwargs,
                 };
+
+                // LM Studio doesn't forward chat_template_kwargs to the Jinja
+                // renderer. Shape the behaviour manually by mutating the
+                // messages stream: enable_thinking=false → append an
+                // assistant-role continuation that pre-closes the thought
+                // channel (goetia-family syntax); enable_thinking=true → plant
+                // a [ENABLE_THINKING] marker in the system prompt for chat
+                // templates that opt-in to detecting it. This runs server-side
+                // so it's effective regardless of a stale client cache. Skips
+                // if the last message is already an assistant continuation
+                // (continue mode) to avoid double-prefill.
+                if (Array.isArray(request.body.messages)) {
+                    const kwargs = request.body.chat_template_kwargs;
+                    const lastMsg = request.body.messages[request.body.messages.length - 1];
+                    const isContinuation = lastMsg && lastMsg.role === 'assistant';
+                    if (kwargs.enable_thinking === false && !isContinuation) {
+                        request.body.messages.push({
+                            role: 'assistant',
+                            content: '<|channel>thought\n<channel|>',
+                        });
+                    } else if (kwargs.enable_thinking === true) {
+                        const marker = '[ENABLE_THINKING]';
+                        const sysIdx = request.body.messages.findIndex(m => m && m.role === 'system' && typeof m.content === 'string');
+                        if (sysIdx >= 0) {
+                            const original = String(request.body.messages[sysIdx].content);
+                            if (!original.includes(marker)) {
+                                request.body.messages[sysIdx] = {
+                                    ...request.body.messages[sysIdx],
+                                    content: original ? `${original}\n\n${marker}` : marker,
+                                };
+                            }
+                        } else {
+                            request.body.messages.unshift({ role: 'system', content: marker });
+                        }
+                    }
+                }
             }
 
             embedOpenRouterMedia(request.body.messages, { audio: true, video: false });
