@@ -2923,11 +2923,6 @@ export async function createGenerationParameters(settings, model, type, messages
         generate_data.custom_exclude_body = substituteParams(settings.custom_exclude_body);
         generate_data.custom_include_headers = substituteParams(settings.custom_include_headers);
 
-        generate_data.chat_template_kwargs = {
-            ...(generate_data.chat_template_kwargs || {}),
-            enable_thinking: Boolean(settings.lmstudio_enable_thinking),
-        };
-
         // LM Studio (as of 0.4.19) accepts `chat_template_kwargs` in the request
         // body but does not forward it to the Jinja renderer, AND it strips the
         // trailing add_generation_prompt block of the model's own chat template
@@ -2935,14 +2930,27 @@ export async function createGenerationParameters(settings, model, type, messages
         // completion of the rendered template). That means neither the kwarg nor
         // the template's own thinking-suppress prefill reach the model. So we
         // shape the behaviour manually:
-        //  - Toggle On  → plant [ENABLE_THINKING] in the system prompt so a
+        //  - Effective On  → plant [ENABLE_THINKING] in the system prompt so a
         //    patched chat template (if the user overrides one in LM Studio) can
         //    detect it.
-        //  - Toggle Off → append an assistant-role continuation that pre-closes
+        //  - Effective Off → append an assistant-role continuation that pre-closes
         //    the thought channel. Goetia-family models see the empty channel as
         //    already-consumed thinking and produce the response directly.
+        // Tool calls force thinking off regardless of the toggle: ST's tool-call
+        // parser can't consume a reasoning block that precedes the tool_call.
+        // Continue mode owns its own assistant prefill — leave the message
+        // stream alone there.
+        const hasTools = Array.isArray(generate_data.tools) && generate_data.tools.length > 0;
+        const isContinue = type === 'continue';
+        const effectiveThinking = Boolean(settings.lmstudio_enable_thinking) && !hasTools;
+
+        generate_data.chat_template_kwargs = {
+            ...(generate_data.chat_template_kwargs || {}),
+            enable_thinking: effectiveThinking,
+        };
+
         if (Array.isArray(generate_data.messages)) {
-            if (settings.lmstudio_enable_thinking) {
+            if (effectiveThinking) {
                 const marker = '[ENABLE_THINKING]';
                 const sysIdx = generate_data.messages.findIndex(m => m && m.role === 'system' && typeof m.content === 'string');
                 if (sysIdx >= 0) {
@@ -2956,19 +2964,11 @@ export async function createGenerationParameters(settings, model, type, messages
                 } else {
                     generate_data.messages.unshift({ role: 'system', content: marker });
                 }
-            } else {
-                // Suppress the off-prefill when the request needs the model to
-                // emit tool_calls or continue an existing assistant message. In
-                // those modes an extra assistant-role continuation would either
-                // starve the tool_call channel or double-prefill mid-response.
-                const hasTools = Array.isArray(generate_data.tools) && generate_data.tools.length > 0;
-                const isContinue = type === 'continue';
-                if (!hasTools && !isContinue) {
-                    generate_data.messages.push({
-                        role: 'assistant',
-                        content: '<|channel>thought\n<channel|>',
-                    });
-                }
+            } else if (!isContinue) {
+                generate_data.messages.push({
+                    role: 'assistant',
+                    content: '<|channel>thought\n<channel|>',
+                });
             }
         }
     }
