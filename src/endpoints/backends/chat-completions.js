@@ -2398,6 +2398,14 @@ router.post('/generate', async function (request, response) {
 
             mergeObjectWithYaml(bodyParams, request.body.custom_include_body);
             mergeObjectWithYaml(headers, request.body.custom_include_headers);
+
+            if (request.body.chat_template_kwargs && typeof request.body.chat_template_kwargs === 'object') {
+                bodyParams.chat_template_kwargs = {
+                    ...(bodyParams.chat_template_kwargs || {}),
+                    ...request.body.chat_template_kwargs,
+                };
+            }
+
             embedOpenRouterMedia(request.body.messages, { audio: true, video: false });
             if (request.body.json_schema) {
                 bodyParams['response_format'] = {

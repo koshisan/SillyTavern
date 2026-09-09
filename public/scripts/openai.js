@@ -245,6 +245,12 @@ export const reasoning_effort_types = {
     max: 'max',
 };
 
+export const lmstudio_thinking_states = {
+    auto: 'auto',
+    on: 'on',
+    off: 'off',
+};
+
 export const verbosity_levels = {
     auto: 'auto',
     low: 'low',
@@ -393,6 +399,7 @@ export const settingsToUpdate = {
     tool_call_recurse_limit: ['#tool_call_recurse_limit', 'tool_call_recurse_limit', false, false],
     show_thoughts: ['#openai_show_thoughts', 'show_thoughts', true, false],
     reasoning_effort: ['#openai_reasoning_effort', 'reasoning_effort', false, false],
+    lmstudio_enable_thinking: ['#NULL_SELECTOR', 'lmstudio_enable_thinking', false, false],
     verbosity: ['#openai_verbosity', 'verbosity', false, false],
     enable_web_search: ['#openai_enable_web_search', 'enable_web_search', true, false],
     seed: ['#seed_openai', 'seed', false, false],
@@ -514,6 +521,7 @@ const default_settings = {
     seed: -1,
     n: 1,
     bind_preset_to_connection: true,
+    lmstudio_enable_thinking: 'auto',
     extensions: {},
 };
 
@@ -2920,6 +2928,12 @@ export async function createGenerationParameters(settings, model, type, messages
         generate_data.custom_include_body = substituteParams(settings.custom_include_body);
         generate_data.custom_exclude_body = substituteParams(settings.custom_exclude_body);
         generate_data.custom_include_headers = substituteParams(settings.custom_include_headers);
+
+        if (settings.lmstudio_enable_thinking === lmstudio_thinking_states.on) {
+            generate_data.chat_template_kwargs = { ...(generate_data.chat_template_kwargs || {}), enable_thinking: true };
+        } else if (settings.lmstudio_enable_thinking === lmstudio_thinking_states.off) {
+            generate_data.chat_template_kwargs = { ...(generate_data.chat_template_kwargs || {}), enable_thinking: false };
+        }
     }
 
     if (settings.chat_completion_source === chat_completion_sources.COHERE) {
@@ -7378,4 +7392,53 @@ export function initOpenAI() {
     $('#openai_proxy_access_key_show').on('click', onProxyAccessKeyShowClick);
     $('#customize_additional_parameters').on('click', onCustomizeParametersClick);
     $('#openai_proxy_preset').on('change', onProxyPresetChange);
+
+    initLmstudioThinkingWand();
+}
+
+function initLmstudioThinkingWand() {
+    const buttonHtml = `
+        <div id="lmstudio_thinking_toggle" class="list-group-item flex-container flexGap5" title="${t`Toggle enable_thinking chat_template_kwargs for OpenAI-compatible (Custom) sources such as LM Studio.`}">
+            <div class="fa-solid fa-brain extensionsMenuExtensionButton"></div>
+            <span class="lmstudio_thinking_label"></span>
+        </div>`;
+    $('#lmstudio_thinking_wand_container').append(buttonHtml);
+
+    const $button = $('#lmstudio_thinking_toggle');
+    const $label = $button.find('.lmstudio_thinking_label');
+
+    const stateLabel = () => {
+        switch (oai_settings.lmstudio_enable_thinking) {
+            case lmstudio_thinking_states.on: return t`Thinking: On`;
+            case lmstudio_thinking_states.off: return t`Thinking: Off`;
+            default: return t`Thinking: Auto`;
+        }
+    };
+
+    const refreshVisual = () => {
+        $label.text(stateLabel());
+        $button
+            .toggleClass('lmstudio_thinking_on', oai_settings.lmstudio_enable_thinking === lmstudio_thinking_states.on)
+            .toggleClass('lmstudio_thinking_off', oai_settings.lmstudio_enable_thinking === lmstudio_thinking_states.off);
+    };
+
+    const refreshVisibility = () => {
+        const visible = oai_settings.chat_completion_source === chat_completion_sources.CUSTOM;
+        $button.toggle(visible);
+    };
+
+    $button.on('click', function () {
+        const cycle = [lmstudio_thinking_states.auto, lmstudio_thinking_states.on, lmstudio_thinking_states.off];
+        const cur = oai_settings.lmstudio_enable_thinking;
+        const idx = cycle.indexOf(cur);
+        oai_settings.lmstudio_enable_thinking = cycle[(idx + 1) % cycle.length] ?? lmstudio_thinking_states.auto;
+        refreshVisual();
+        saveSettingsDebounced();
+    });
+
+    eventSource.on(event_types.CHATCOMPLETION_SOURCE_CHANGED, refreshVisibility);
+    eventSource.on(event_types.SETTINGS_UPDATED, refreshVisual);
+
+    refreshVisual();
+    refreshVisibility();
 }
