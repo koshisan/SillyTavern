@@ -2959,7 +2959,7 @@ export async function createGenerationParameters(settings, model, type, messages
             } else {
                 generate_data.messages.push({
                     role: 'assistant',
-                    content: '<|channel>thought\n<channel|>\n',
+                    content: '<|channel>thought\n<channel|>',
                 });
             }
         }
