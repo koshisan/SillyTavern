@@ -2936,13 +2936,16 @@ export async function createGenerationParameters(settings, model, type, messages
         //  - Effective Off → append an assistant-role continuation that pre-closes
         //    the thought channel. Goetia-family models see the empty channel as
         //    already-consumed thinking and produce the response directly.
-        // Tool calls force thinking off regardless of the toggle: ST's tool-call
-        // parser can't consume a reasoning block that precedes the tool_call.
+        // Tool calls + all utility roundtrips (quiet gens for expression
+        // classification, SD prompt generation, summaries, translation, …)
+        // force thinking off regardless of the toggle: the parsers on the
+        // receiving end expect a compact answer and choke on reasoning blocks.
         // Continue mode owns its own assistant prefill — leave the message
         // stream alone there.
         const hasTools = Array.isArray(generate_data.tools) && generate_data.tools.length > 0;
         const isContinue = type === 'continue';
-        const effectiveThinking = Boolean(settings.lmstudio_enable_thinking) && !hasTools;
+        const isUtilityGen = type === 'quiet' || hasTools;
+        const effectiveThinking = Boolean(settings.lmstudio_enable_thinking) && !isUtilityGen;
 
         generate_data.chat_template_kwargs = {
             ...(generate_data.chat_template_kwargs || {}),
