@@ -2927,6 +2927,27 @@ export async function createGenerationParameters(settings, model, type, messages
             ...(generate_data.chat_template_kwargs || {}),
             enable_thinking: Boolean(settings.lmstudio_enable_thinking),
         };
+
+        // LM Studio (as of 0.4.19) accepts `chat_template_kwargs` in the request
+        // body but does not forward it to the Jinja renderer. As a fallback, plant
+        // the marker in the system prompt so a patched chat template can pick it
+        // up. Templates that don't scan for the marker simply ignore it (or strip
+        // it themselves).
+        if (settings.lmstudio_enable_thinking && Array.isArray(generate_data.messages)) {
+            const marker = '[ENABLE_THINKING]';
+            const sysIdx = generate_data.messages.findIndex(m => m && m.role === 'system' && typeof m.content === 'string');
+            if (sysIdx >= 0) {
+                const original = String(generate_data.messages[sysIdx].content);
+                if (!original.includes(marker)) {
+                    generate_data.messages[sysIdx] = {
+                        ...generate_data.messages[sysIdx],
+                        content: original ? `${original}\n\n${marker}` : marker,
+                    };
+                }
+            } else {
+                generate_data.messages.unshift({ role: 'system', content: marker });
+            }
+        }
     }
 
     if (settings.chat_completion_source === chat_completion_sources.COHERE) {
