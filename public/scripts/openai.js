@@ -2929,23 +2929,38 @@ export async function createGenerationParameters(settings, model, type, messages
         };
 
         // LM Studio (as of 0.4.19) accepts `chat_template_kwargs` in the request
-        // body but does not forward it to the Jinja renderer. As a fallback, plant
-        // the marker in the system prompt so a patched chat template can pick it
-        // up. Templates that don't scan for the marker simply ignore it (or strip
-        // it themselves).
-        if (settings.lmstudio_enable_thinking && Array.isArray(generate_data.messages)) {
-            const marker = '[ENABLE_THINKING]';
-            const sysIdx = generate_data.messages.findIndex(m => m && m.role === 'system' && typeof m.content === 'string');
-            if (sysIdx >= 0) {
-                const original = String(generate_data.messages[sysIdx].content);
-                if (!original.includes(marker)) {
-                    generate_data.messages[sysIdx] = {
-                        ...generate_data.messages[sysIdx],
-                        content: original ? `${original}\n\n${marker}` : marker,
-                    };
+        // body but does not forward it to the Jinja renderer, AND it strips the
+        // trailing add_generation_prompt block of the model's own chat template
+        // (verified empirically against goetia: ~7 tokens missing vs. a raw
+        // completion of the rendered template). That means neither the kwarg nor
+        // the template's own thinking-suppress prefill reach the model. So we
+        // shape the behaviour manually:
+        //  - Toggle On  → plant [ENABLE_THINKING] in the system prompt so a
+        //    patched chat template (if the user overrides one in LM Studio) can
+        //    detect it.
+        //  - Toggle Off → append an assistant-role continuation that pre-closes
+        //    the thought channel. Goetia-family models see the empty channel as
+        //    already-consumed thinking and produce the response directly.
+        if (Array.isArray(generate_data.messages)) {
+            if (settings.lmstudio_enable_thinking) {
+                const marker = '[ENABLE_THINKING]';
+                const sysIdx = generate_data.messages.findIndex(m => m && m.role === 'system' && typeof m.content === 'string');
+                if (sysIdx >= 0) {
+                    const original = String(generate_data.messages[sysIdx].content);
+                    if (!original.includes(marker)) {
+                        generate_data.messages[sysIdx] = {
+                            ...generate_data.messages[sysIdx],
+                            content: original ? `${original}\n\n${marker}` : marker,
+                        };
+                    }
+                } else {
+                    generate_data.messages.unshift({ role: 'system', content: marker });
                 }
             } else {
-                generate_data.messages.unshift({ role: 'system', content: marker });
+                generate_data.messages.push({
+                    role: 'assistant',
+                    content: '<|channel>thought\n<channel|>\n',
+                });
             }
         }
     }
