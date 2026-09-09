@@ -2957,10 +2957,18 @@ export async function createGenerationParameters(settings, model, type, messages
                     generate_data.messages.unshift({ role: 'system', content: marker });
                 }
             } else {
-                generate_data.messages.push({
-                    role: 'assistant',
-                    content: '<|channel>thought\n<channel|>',
-                });
+                // Suppress the off-prefill when the request needs the model to
+                // emit tool_calls or continue an existing assistant message. In
+                // those modes an extra assistant-role continuation would either
+                // starve the tool_call channel or double-prefill mid-response.
+                const hasTools = Array.isArray(generate_data.tools) && generate_data.tools.length > 0;
+                const isContinue = type === 'continue';
+                if (!hasTools && !isContinue) {
+                    generate_data.messages.push({
+                        role: 'assistant',
+                        content: '<|channel>thought\n<channel|>',
+                    });
+                }
             }
         }
     }
