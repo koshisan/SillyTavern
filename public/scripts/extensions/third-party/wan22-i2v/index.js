@@ -270,6 +270,36 @@ function decorateAll() {
     }
 }
 
+/**
+ * MutationObserver that catches .mes_img_controls insertions/replacements
+ * anywhere in the chat. appendMediaToMessage() (and IMAGE_SWIPED) clone
+ * #message_image_template.mes_img_container into the DOM, wiping any
+ * previously-injected buttons — the observer re-decorates as soon as the
+ * new bar appears.
+ */
+function installMutationObserver() {
+    const chatEl = document.getElementById('chat');
+    if (!chatEl) {
+        setTimeout(installMutationObserver, 200);
+        return;
+    }
+    const observer = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+            for (const node of m.addedNodes) {
+                if (!(node instanceof Element)) continue;
+                // Fast path: the added node is or contains .mes_img_controls
+                if (node.classList?.contains('mes_img_controls') ||
+                    node.querySelector?.('.mes_img_controls')) {
+                    const mes = node.closest?.('.mes[mesid]');
+                    if (mes) decorateMessage(mes);
+                    else decorateAll();
+                }
+            }
+        }
+    });
+    observer.observe(chatEl, { childList: true, subtree: true });
+}
+
 async function initExtension() {
     getSettings();
     await initSettingsPanel();
@@ -289,6 +319,7 @@ async function initExtension() {
         eventSource.on(t, () => setTimeout(decorateAll, 0));
     }
     setTimeout(decorateAll, 500);
+    installMutationObserver();
     console.log('[wan22-i2v] extension loaded');
 }
 
