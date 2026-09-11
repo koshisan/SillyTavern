@@ -11196,9 +11196,12 @@ jQuery(async function () {
 
     //limit swiping to the last message (or the effectively-last swipeable one
     //when trailing ghost messages pushed it off the DOM tail — same
-    //conditions that CSS now uses to un-hide the chevrons).
-    $(document).on('click', ':is(.last_mes, .last_swipe, .swipes_visible) .swipe_right', async (e, data) => await swipe(e, SWIPE_DIRECTION.RIGHT, data));
-    $(document).on('click', ':is(.last_mes, .last_swipe, .swipes_visible) .swipe_left', async (e, data) => await swipe(e, SWIPE_DIRECTION.LEFT, data));
+    //conditions that CSS now uses to un-hide the chevrons). jQuery 3.5.1's
+    //Sizzle doesn't parse CSS-4 :is(), so spell the selector as a comma list.
+    const swipeRightSelector = '.last_mes .swipe_right, .last_swipe .swipe_right, .swipes_visible .swipe_right';
+    const swipeLeftSelector = '.last_mes .swipe_left, .last_swipe .swipe_left, .swipes_visible .swipe_left';
+    $(document).on('click', swipeRightSelector, async (e, data) => await swipe(e, SWIPE_DIRECTION.RIGHT, data));
+    $(document).on('click', swipeLeftSelector, async (e, data) => await swipe(e, SWIPE_DIRECTION.LEFT, data));
 
     initCharacterSearch();
 
