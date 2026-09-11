@@ -190,14 +190,26 @@ async function generateVideoForMessage(messageId) {
         const filename = `wan22_i2v_${Date.now()}`;
         const path = await saveBase64AsFile(data.data, charName, filename, data.format);
 
-        // Append to the message's media list.
+        // Append to the message's media list. Inherit .title and .negative
+        // from the source image so ST's SD-overswipe path (which reads
+        // mediaAttachment.title/negative to seed the next generation) still
+        // has the original prompt to work with when the user cycles past
+        // the video into a fresh image gen.
         if (!Array.isArray(message.extra.media)) message.extra.media = [];
+        const sourceMedia = message.extra.media[shot.index] || {};
         message.extra.media.push({
             url: path,
             type: MEDIA_TYPE.VIDEO,
-            title: t`Wan2.2 i2v (from image #${shot.index + 1})`,
+            title: sourceMedia.title ?? message.extra.title ?? '',
+            negative: sourceMedia.negative ?? message.extra.negative ?? '',
+            width: sourceMedia.width,
+            height: sourceMedia.height,
             source: MEDIA_SOURCE.GENERATED,
-            generation_type: 'wan22-i2v',
+            generation_type: sourceMedia.generation_type ?? message.extra.generationType,
+            wan22_i2v: {
+                source_index: shot.index,
+                source_title: sourceMedia.title ?? '',
+            },
         });
         message.extra.media_index = message.extra.media.length - 1;
         // Focus displayed variant on the new item.
