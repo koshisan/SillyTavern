@@ -1,0 +1,8 @@
+{
+  "name": "wan22-i2v",
+  "version": "0.1.0",
+  "description": "Send SillyTavern SD-generated images through a ComfyUI Wan2.2 image-to-video workflow and add the resulting clip as a swipe on the source message.",
+  "main": "index.js",
+  "type": "module",
+  "private": true
+}
