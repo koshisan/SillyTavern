@@ -10326,7 +10326,41 @@ export async function swipe(event, direction, { source, repeated, message = chat
 
         if (run_generate && !is_send_press) {
             is_send_press = true;
+            // Generate('swipe') and saveReply target chat[chat.length - 1]. If
+            // the message being swiped isn't literally last — e.g. there's an
+            // SD-generated is_system image below it — pull those trailing ghost
+            // messages out for the duration of the generation and restore them
+            // afterwards. isMessageSwipeable already refuses to enter this
+            // branch unless every trailing message is is_system, so removal is
+            // safe.
+            let stashedGhosts = null;
+            if (mesId < chat.length - 1 && chat.slice(mesId + 1).every(m => m?.is_system)) {
+                stashedGhosts = chat.splice(mesId + 1);
+                for (const ghost of stashedGhosts) {
+                    if (ghost && typeof ghost === 'object') {
+                        ghost.__ghost_stashed_at = mesId + 1;
+                    }
+                }
+                // Detach their DOM nodes so the visual "swipe in" animation
+                // targets the actual last on-screen message.
+                chatElement.children('.mes[mesid]').filter((_, div) => {
+                    const id = Number(div.getAttribute('mesid'));
+                    return id > mesId;
+                }).remove();
+            }
             generation = Generate('swipe');
+            if (stashedGhosts && stashedGhosts.length) {
+                generation.finally(async () => {
+                    // After generation settles, chat[mesId] carries the new
+                    // swipe text; append ghosts back in their original order.
+                    for (const ghost of stashedGhosts) {
+                        chat.push(ghost);
+                        addOneMessage(ghost, { insertAfter: chat.length - 2, scroll: false });
+                    }
+                    await saveChatConditional();
+                    refreshSwipeButtons();
+                });
+            }
         }
 
         //Swipe in from the opposite side.
