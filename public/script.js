@@ -9979,6 +9979,14 @@ export async function swipe(event, direction, { source, repeated, message = chat
     }
 
     const mesId = Number(forceMesId ?? event?.currentTarget?.closest('.mes')?.getAttribute('mesid') ?? messageIndex ?? chat.length - 1);
+    // Re-anchor `message` to whatever `mesId` actually points at. The default
+    // parameter (`chat[chat.length - 1]`) can diverge from mesId when the
+    // caller comes from a click on an earlier swipeable message (e.g. text
+    // followed by a ghost image) — passing that stale ghost into
+    // isMessageSwipeable would fail the !is_system guard and abort the swipe.
+    if (chat[mesId] && chat[mesId] !== message) {
+        message = chat[mesId];
+    }
 
     if ([SWIPE_SOURCE.DELETE, SWIPE_SOURCE.BACK, SWIPE_SOURCE.AUTO_SWIPE, SWIPE_SOURCE.SLASH_COMMAND, SWIPE_SOURCE.SWIPE_PICKER].includes(source)) {
         console.info(`The ${direction} swipe source on message #${mesId} is ${source}, Most checks have been bypassed. `);
