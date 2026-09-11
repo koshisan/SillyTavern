@@ -306,10 +306,32 @@ function installMutationObserver() {
                     if (mes) decorateMessage(mes);
                     else decorateAll();
                 }
+                // Loop every video in a message media container.
+                loopVideosIn(node);
             }
         }
     });
     observer.observe(chatEl, { childList: true, subtree: true });
+    // Cover any videos that were already in the DOM before the observer
+    // came online (initial chat render).
+    loopVideosIn(chatEl);
+}
+
+/**
+ * Set loop=true on every <video class="mes_video"> under the given root.
+ * SillyTavern's #message_video_template doesn't include the attribute, so
+ * ST-generated videos don't loop by default. Wan2.2 i2v clips are 1-2s
+ * teasers and always feel better on repeat.
+ * @param {Element|Document} root
+ */
+function loopVideosIn(root) {
+    if (!root) return;
+    const videos = root.classList?.contains?.('mes_video')
+        ? [root]
+        : root.querySelectorAll?.('video.mes_video') ?? [];
+    for (const v of videos) {
+        if (!v.loop) v.loop = true;
+    }
 }
 
 async function initExtension() {
