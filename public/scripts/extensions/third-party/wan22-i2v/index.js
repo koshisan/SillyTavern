@@ -204,6 +204,9 @@ async function generateVideoForMessage(messageId) {
         await saveChatConditional();
         const messageBlock = $(`#chat .mes[mesid="${messageId}"]`);
         if (messageBlock.length) appendMediaToMessage(message, messageBlock, SCROLL_BEHAVIOR.KEEP);
+        // appendMediaToMessage wipes and re-renders the media container, so
+        // our previously-injected button is gone. Re-decorate right after.
+        decorateAll();
         toastr.success(t`Video ready.`);
     } catch (e) {
         console.error('[wan22-i2v] generate error', e);
@@ -232,7 +235,8 @@ function decorateMessage(mesEl) {
     // Slot into the same hover-overlay bar that carries the caption / zoom /
     // delete icons. Every image message renders one .mes_img_controls per
     // image container; find them all so a multi-media message still gets a
-    // button on each frame.
+    // button on each frame. Insert *before* the delete button so muscle
+    // memory (delete rightmost) stays intact.
     const controlBars = el.querySelectorAll('.mes_img_container .mes_img_controls');
     if (!controlBars.length) return;
     for (const bar of controlBars) {
@@ -251,7 +255,12 @@ function decorateMessage(mesEl) {
                 btn.classList.remove('busy');
             }
         });
-        bar.appendChild(btn);
+        const deleteBtn = bar.querySelector('.mes_media_delete');
+        if (deleteBtn) {
+            bar.insertBefore(btn, deleteBtn);
+        } else {
+            bar.appendChild(btn);
+        }
     }
 }
 
@@ -265,13 +274,16 @@ async function initExtension() {
     getSettings();
     await initSettingsPanel();
 
-    // React to messages being rendered/updated/appended.
+    // React to messages being rendered/updated/appended. IMAGE_SWIPED fires
+    // when the user cycles through the media gallery — the container is
+    // re-rendered, so we have to re-inject.
     const relevant = [
         event_types.CHARACTER_MESSAGE_RENDERED,
         event_types.MESSAGE_UPDATED,
         event_types.MESSAGE_SWIPED,
         event_types.MESSAGE_RECEIVED,
         event_types.CHAT_CHANGED,
+        event_types.IMAGE_SWIPED,
     ];
     for (const t of relevant) {
         eventSource.on(t, () => setTimeout(decorateAll, 0));
