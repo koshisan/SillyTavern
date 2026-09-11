@@ -7,9 +7,8 @@
 // SillyTavern's built-in gallery-swipe UI (chats.js:onImageSwiped) picks up
 // the additional item automatically — no core-script changes needed.
 
-import { chat, saveSettingsDebounced, saveChatConditional, eventSource, event_types, getRequestHeaders } from '../../../../script.js';
-import { extension_settings, renderExtensionTemplateAsync } from '../../extensions.js';
-import { appendMediaToMessage } from '../../../chats.js';
+import { chat, saveSettingsDebounced, saveChatConditional, eventSource, event_types, getRequestHeaders, appendMediaToMessage } from '../../../../script.js';
+import { extension_settings, renderExtensionTemplateAsync } from '../../../extensions.js';
 import { saveBase64AsFile } from '../../../utils.js';
 import { MEDIA_SOURCE, MEDIA_TYPE, SCROLL_BEHAVIOR } from '../../../constants.js';
 import { t } from '../../../i18n.js';

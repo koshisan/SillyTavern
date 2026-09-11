@@ -129,13 +129,15 @@ async function init(router) {
                 throw new Error(`ComfyUI error: ${JSON.stringify(err).slice(0, 500)}`);
             }
 
-            // Find the video output. Wan2.2 SaveVideo emits under outputs.<node>.videos[0].
-            // Fall back to gifs[] for older/animation nodes.
-            const outputs = Object.values(item.outputs || {});
-            const videoInfo =
-                outputs.map(o => o.videos).filter(Array.isArray).flat()[0] ??
-                outputs.map(o => o.gifs).filter(Array.isArray).flat()[0];
-            if (!videoInfo) throw new Error('ComfyUI outputs did not contain a video');
+            // Find the video output. ComfyUI's SaveVideo node emits under
+            // outputs.<node>.images (yes, .images) with an .animated:true
+            // sibling and a filename ending in .mp4/.webm. Older AnimateDiff
+            // saver nodes use outputs.videos or outputs.gifs. Cover all three.
+            const videoInfo = findVideoInOutputs(item.outputs || {});
+            if (!videoInfo) {
+                console.warn('[wan22-i2v] outputs snapshot:', JSON.stringify(item.outputs).slice(0, 1000));
+                throw new Error('ComfyUI outputs did not contain a video');
+            }
 
             const viewUrl = new URL(joinUrl(url, '/view'));
             viewUrl.search = `?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder || '')}&type=${encodeURIComponent(videoInfo.type || 'output')}`;
@@ -150,6 +152,35 @@ async function init(router) {
             res.status(500).send({ error: e.message });
         }
     });
+}
+
+const VIDEO_EXTS = new Set(['mp4', 'webm', 'gif', 'mov', 'mkv']);
+
+/**
+ * Locate the produced video across the various node output shapes ComfyUI
+ * uses. Returns the first hit as {filename, subfolder, type}.
+ * @param {Record<string, any>} outputsMap
+ */
+function findVideoInOutputs(outputsMap) {
+    for (const node of Object.values(outputsMap)) {
+        for (const key of ['videos', 'gifs']) {
+            const list = node?.[key];
+            if (Array.isArray(list) && list.length) return list[0];
+        }
+        // New SaveVideo path — images list carrying the .mp4, animated: true.
+        const images = node?.images;
+        if (Array.isArray(images) && images.length) {
+            const animated = node.animated === true || node.animated === 'true';
+            const videoLike = images.find(img => {
+                const fn = String(img?.filename ?? '');
+                const ext = fn.split('.').pop().toLowerCase();
+                return VIDEO_EXTS.has(ext);
+            });
+            if (videoLike) return videoLike;
+            if (animated && images[0]) return images[0];
+        }
+    }
+    return null;
 }
 
 /**
