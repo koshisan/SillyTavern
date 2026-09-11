@@ -229,20 +229,30 @@ function decorateMessage(mesEl) {
     const hasImage = message.extra.media.some(m => !m?.type || m.type === MEDIA_TYPE.IMAGE);
     if (!hasImage) return;
 
-    const container = el.querySelector('.mes_img_container') || el.querySelector('.mes_block');
-    if (!container) return;
-    if (container.querySelector('.wan22-i2v-btn')) return; // already decorated
-
-    const btn = document.createElement('div');
-    btn.className = 'wan22-i2v-btn mes_button interactable';
-    btn.title = t`Generate video from image (Wan2.2)`;
-    btn.innerHTML = '<i class="fa-solid fa-film"></i>';
-    btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        await generateVideoForMessage(messageId);
-    });
-    container.appendChild(btn);
+    // Slot into the same hover-overlay bar that carries the caption / zoom /
+    // delete icons. Every image message renders one .mes_img_controls per
+    // image container; find them all so a multi-media message still gets a
+    // button on each frame.
+    const controlBars = el.querySelectorAll('.mes_img_container .mes_img_controls');
+    if (!controlBars.length) return;
+    for (const bar of controlBars) {
+        if (bar.querySelector('.wan22-i2v-btn')) continue;
+        const btn = document.createElement('div');
+        btn.className = 'right_menu_button fa-lg fa-solid fa-film wan22-i2v-btn';
+        btn.title = t`Generate video from image (Wan2.2)`;
+        btn.dataset.messageId = String(messageId);
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            btn.classList.add('busy');
+            try {
+                await generateVideoForMessage(messageId);
+            } finally {
+                btn.classList.remove('busy');
+            }
+        });
+        bar.appendChild(btn);
+    }
 }
 
 function decorateAll() {

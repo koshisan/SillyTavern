@@ -1,35 +1,29 @@
-/* Video-generate button that appears as an overlay on messages carrying an
-   SD-generated image. Positioned in the media container to sit next to the
-   existing delete button. */
-.wan22-i2v-btn {
-    position: absolute;
-    top: 6px;
-    right: 40px;
-    width: 26px;
-    height: 26px;
-    border-radius: 4px;
-    background-color: rgba(0, 0, 0, 0.55);
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    opacity: 0.85;
-    transition: opacity var(--animation-duration, 125ms) ease;
-    z-index: 10;
-}
-
-.wan22-i2v-btn:hover {
-    opacity: 1;
-    background-color: rgba(0, 0, 0, 0.75);
-}
+/* The video-generate button rides inside the existing .mes_img_controls
+   hover overlay next to caption / zoom / delete, so it inherits the
+   fade-in-on-hover styling for free. Only two knobs here:
+   - a global on/off toggle from the settings drawer.
+   - an active-state spinner while a generation is in flight. */
 
 body.wan22-i2v-buttons-hidden .wan22-i2v-btn {
     display: none;
 }
 
-/* Ensure the container that ST uses for media is a positioning parent so our
-   absolutely-positioned button anchors correctly. */
-.mes_img_container {
-    position: relative;
+.wan22-i2v-btn.busy {
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+.wan22-i2v-btn.busy::before {
+    content: "";
+    /* Font Awesome swap: replace film icon with spinner while busy */
+    font: inherit;
+}
+
+.wan22-i2v-btn.busy {
+    animation: wan22-i2v-spin 1s linear infinite;
+}
+
+@keyframes wan22-i2v-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
 }
