@@ -9188,19 +9188,29 @@ export function isMessageSwipeable(messageId, message = undefined) {
         syncMesToSwipe(messageId);
     }
 
+    //The message is the last one in the LLM's view: either literally last, or
+    //everything after it is a system/ghost message (e.g. an SD-generated image
+    //flagged is_system:true). Ghost messages are already excluded from the
+    //regen prompt in Generate() via chat.filter(!is_system), so allowing the
+    //swipe here is safe.
+    const isLastVisible = messageId === chat.length - 1
+        || chat.slice(messageId + 1).every(m => m?.is_system);
+
     if (
         //Only messages below the currently edited message can be swiped, if it's not mid-swipe edit.
         ((messageId > (this_edit_mes_id ?? -1)) && (swipeState != SWIPE_STATE.EDITING)) &&
 
-        //If the message is the last message, and it exists.
-        (messageId == chat.length - 1) &&
+        //If the message is the (effectively) last message, and it exists.
+        isLastVisible &&
         (message &&
             //Small system messages cannot be swiped.
             !(message?.extra?.isSmallSys) &&
             //Some messages, like the welcome screen, are not swipeable.
             !(message?.extra?.swipeable === false) &&
             //User messages are not swipeable.
-            !message.is_user
+            !message.is_user &&
+            //Ghost/system messages themselves are not swipeable.
+            !message.is_system
         )
     ) {
         // The message is swipeable.
