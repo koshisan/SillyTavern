@@ -11186,9 +11186,11 @@ jQuery(async function () {
 
     ///// SWIPE BUTTON CLICKS ///////
 
-    //limit swiping to only last message clicks
-    $(document).on('click', '.last_mes .swipe_right', async (e, data) => await swipe(e, SWIPE_DIRECTION.RIGHT, data));
-    $(document).on('click', '.last_mes .swipe_left', async (e, data) => await swipe(e, SWIPE_DIRECTION.LEFT, data));
+    //limit swiping to the last message (or the effectively-last swipeable one
+    //when trailing ghost messages pushed it off the DOM tail — same
+    //conditions that CSS now uses to un-hide the chevrons).
+    $(document).on('click', ':is(.last_mes, .last_swipe, .swipes_visible) .swipe_right', async (e, data) => await swipe(e, SWIPE_DIRECTION.RIGHT, data));
+    $(document).on('click', ':is(.last_mes, .last_swipe, .swipes_visible) .swipe_left', async (e, data) => await swipe(e, SWIPE_DIRECTION.LEFT, data));
 
     initCharacterSearch();
 
